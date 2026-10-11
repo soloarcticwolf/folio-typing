@@ -1,12 +1,26 @@
 import type { ReactNode } from "react";
 
-export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+export function Tooltip({
+  label,
+  align = "center",
+  children,
+}: {
+  label: string;
+  align?: "left" | "center" | "right";
+  children: ReactNode;
+}) {
+  const position =
+    align === "right"
+      ? "right-0"
+      : align === "left"
+        ? "left-0"
+        : "left-1/2 -translate-x-1/2";
   return (
     <span className="group relative inline-flex" title={label}>
       {children}
       <span
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-1.5 hidden -translate-x-1/2 rounded-md border border-line bg-ink px-2 py-1 text-[11px] font-medium whitespace-nowrap text-white group-hover:block group-focus-within:block"
+        className={`pointer-events-none absolute bottom-full z-40 mb-1.5 hidden rounded-md border border-line bg-ink px-2 py-1 text-[11px] font-medium whitespace-nowrap text-white group-hover:block group-focus-within:block ${position}`}
       >
         {label}
       </span>
@@ -16,13 +30,18 @@ export function Tooltip({ label, children }: { label: string; children: ReactNod
 
 export function IconButton({
   label,
+  align = "center",
   active = false,
   className = "",
   children,
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string; active?: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  align?: "left" | "center" | "right";
+  active?: boolean;
+}) {
   return (
-    <Tooltip label={label}>
+    <Tooltip label={label} align={align}>
       <button
         aria-label={label}
         aria-pressed={active}

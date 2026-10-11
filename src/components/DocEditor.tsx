@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold,
@@ -66,8 +65,9 @@ export default function DocEditor({
 
   const editor = useEditor({
     extensions: [
+      // Note: StarterKit already includes Underline — do not add it again
+      // (duplicate extension names corrupt editor state).
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
       Placeholder.configure({ placeholder: "Start writing…" }),
     ],
     content: initialJSON,
@@ -80,14 +80,16 @@ export default function DocEditor({
       timer.current = setTimeout(() => {
         void (async () => {
           try {
-            const json = editor.getJSON() as TiptapDoc;
+            // JSON round-trip: guarantees only plain data crosses to the
+            // Server Action (anything exotic would break transport/storage).
+            const json = JSON.parse(JSON.stringify(editor.getJSON())) as TiptapDoc;
             await saveDocumentAction({ docId, contentJSON: json, contentHTML: editor.getHTML() });
             report({
               kind: "saved",
               text: `Saved ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
             });
-          } catch {
-            report({ kind: "error", text: "Save failed — keep editing to retry" });
+          } catch (e) {
+            report({ kind: "error", text: e instanceof Error ? `Save failed: ${e.message}` : "Save failed — keep editing to retry" });
           }
         })();
       }, 800);

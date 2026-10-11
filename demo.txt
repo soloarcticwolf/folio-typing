@@ -1,0 +1,2 @@
+live_preview_url = https://folio-three-lemon.vercel.app/
+loom_link = https://www.loom.com/share/941dd3bbda7b4fec9ee04ce4141efa13

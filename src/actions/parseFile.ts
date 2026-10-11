@@ -6,7 +6,7 @@ import mammoth from "mammoth";
 import { marked } from "marked";
 import { getDb } from "@/lib/mongo";
 import { requireSession } from "@/lib/session";
-import { textToTiptap, htmlToTiptapText, tiptapToHtml } from "@/lib/tiptap";
+import { textToTiptap, htmlToTiptapText, tiptapToHtml, sanitizeTiptapDoc } from "@/lib/tiptap";
 import { getDocsCol, ensureDocIndexes } from "@/models/document.model";
 
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -24,32 +24,27 @@ export async function parseAndImportAction(formData: FormData): Promise<{ docId:
 
   const title = filename.replace(/\.[^.]+$/, "").slice(0, 200) || "Untitled";
   let tiptap;
-  let html = "";
 
   if (ext === "txt") {
-    const text = await file.text();
-    tiptap = textToTiptap(text);
-    html = tiptapToHtml(tiptap);
+    tiptap = textToTiptap(await file.text());
   } else if (ext === "md") {
-    const text = await file.text();
-    html = await marked.parse(text);
+    const html = await marked.parse(await file.text());
     tiptap = htmlToTiptapText(html);
-    html = tiptapToHtml(tiptap);
   } else {
     const buf = Buffer.from(await file.arrayBuffer());
     const { value } = await mammoth.convertToHtml({ buffer: buf });
-    html = value;
     tiptap = htmlToTiptapText(value);
   }
 
   const db = await getDb();
   await ensureDocIndexes(db);
   const now = new Date();
+  const clean = sanitizeTiptapDoc(tiptap);
   const res = await getDocsCol(db).insertOne({
     ownerId: new ObjectId(session.id),
     title,
-    contentJSON: tiptap,
-    contentHTML: html,
+    contentJSON: clean,
+    contentHTML: tiptapToHtml(clean).slice(0, 500_000),
     createdAt: now,
     updatedAt: now,
   } as never);

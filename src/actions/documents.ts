@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/mongo";
 import { requireSession } from "@/lib/session";
 import { canEdit, canView } from "@/lib/permissions";
-import { tiptapToHtml } from "@/lib/tiptap";
+import { tiptapToHtml, sanitizeTiptapDoc } from "@/lib/tiptap";
 import {
   createDocSchema,
   renameDocSchema,
@@ -120,13 +120,16 @@ export async function saveDocumentAction(input: {
   if (!doc) throw new Error("Not found");
   const shares = await getSharesCol(db).find({ docId: doc._id }).toArray();
   if (!canEdit(doc.ownerId.toHexString(), toSharesRef(shares), session.id)) throw new Error("Forbidden");
-  const html = parsed.contentHTML || tiptapToHtml(parsed.contentJSON);
+  // Rebuild into guaranteed-plain data: only plain JSON-safe values may
+  // reach the database driver (anything exotic crashes BSON serialization).
+  const clean = sanitizeTiptapDoc(parsed.contentJSON);
+  const html = (parsed.contentHTML || tiptapToHtml(clean)).slice(0, 500_000);
   await col.updateOne(
     { _id: doc._id },
     {
       $set: {
         ...(parsed.title ? { title: parsed.title.trim() } : {}),
-        contentJSON: parsed.contentJSON,
+        contentJSON: clean,
         contentHTML: html,
         updatedAt: new Date(),
       },

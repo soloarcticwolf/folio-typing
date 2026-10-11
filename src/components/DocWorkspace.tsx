@@ -2,11 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCheck, Loader2, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CheckCheck, Loader2, AlertTriangle, Trash2 } from "lucide-react";
 import DocEditor, { type SaveStatus } from "@/components/DocEditor";
 import ShareDialog from "@/components/ShareDialog";
 import ExportMenu from "@/components/ExportMenu";
 import { RoleBadge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
+import { Tooltip } from "@/components/ui/primitives";
+import { useToast } from "@/components/ui/Toast";
+import { deleteDocumentAction } from "@/actions/documents";
 import type { DocumentDTO } from "@/models/document.model";
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
@@ -42,7 +48,26 @@ export function DocWorkspace({
   role: "owner" | "viewer" | "editor";
 }) {
   const [status, setStatus] = useState<SaveStatus>({ kind: "saved", text: "Saved" });
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
+  const { push } = useToast();
   const canEdit = role === "owner" || role === "editor";
+  const isOwner = role === "owner";
+
+  const onDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteDocumentAction(doc.id);
+      push("Document deleted");
+      router.push("/docs");
+      router.refresh();
+    } catch (e) {
+      push(e instanceof Error ? e.message : "Could not delete document", "error");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
 
   return (
     <div className="pb-16">
@@ -66,7 +91,18 @@ export function DocWorkspace({
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <SaveIndicator status={status} />
             <ExportMenu docId={doc.id} />
-            <ShareDialog docId={doc.id} isOwner={role === "owner"} />
+            <ShareDialog docId={doc.id} isOwner={isOwner} />
+            {isOwner && (
+              <Tooltip label="Delete document" align="right">
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  aria-label="Delete document"
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-transparent bg-transparent text-ink-2 hover:bg-surface-2 hover:text-destructive"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </Tooltip>
+            )}
           </div>
         </div>
       </header>
@@ -96,6 +132,25 @@ export function DocWorkspace({
           </div>
         </article>
       </div>
+
+      <Dialog
+        open={confirmDelete}
+        onClose={() => {
+          if (!deleting) setConfirmDelete(false);
+        }}
+        title="Delete document?"
+        description={`“${doc.title || "Untitled"}” and its shares will be permanently removed. This cannot be undone.`}
+      >
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+            Keep
+          </Button>
+          <Button variant="destructive" loading={deleting} onClick={() => void onDelete()}>
+            <Trash2 size={15} />
+            Delete
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
